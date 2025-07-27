@@ -40,6 +40,19 @@ function generateLinkTitle(url: string): string {
   return url;
 }
 
+function isUrl(text: string): boolean {
+  try {
+    return Boolean(new URL(text));
+  } catch {
+    return false;
+  }
+}
+
+function isMarkdownWrapped(text: string): boolean {
+  const trimmed = text.trim();
+  return /^\[.*\]\(.*\)$/.test(trimmed) || /^<.*>$/.test(trimmed);
+}
+
 export default class MyPlugin extends Plugin {
   settings: MyPluginSettings;
 
@@ -83,14 +96,35 @@ export default class MyPlugin extends Plugin {
     this.addCommand({
       id: 'insert-smart-link',
       name: 'Insert smart link',
-      editorCallback: (editor: Editor) => {
-        const url = editor.getSelection().trim();
-        if (!url) {
-          new Notice('Please select a URL to convert into a smart link.');
+      editorCallback: async (editor: Editor) => {
+        const selection = editor.getSelection();
+        const trimmedSel = selection.trim();
+        const clipboardText = (await navigator.clipboard.readText()).trim();
+
+        if (!trimmedSel) {
+          if (isUrl(clipboardText)) {
+            const title = generateLinkTitle(clipboardText);
+            editor.replaceSelection(`[${title}](${clipboardText})`);
+          } else {
+            editor.replaceSelection(clipboardText);
+          }
           return;
         }
-        const title = generateLinkTitle(url);
-        editor.replaceSelection(`[${title}](${url})`);
+
+        const selectionIsUrl = isUrl(trimmedSel);
+        const selectionWrapped = isMarkdownWrapped(selection);
+        if (selectionIsUrl && !selectionWrapped) {
+          const title = generateLinkTitle(trimmedSel);
+          editor.replaceSelection(`[${title}](${trimmedSel})`);
+          return;
+        }
+
+        if (!selectionWrapped && isUrl(clipboardText)) {
+          editor.replaceSelection(`[${selection}](${clipboardText})`);
+          return;
+        }
+
+        editor.replaceSelection(clipboardText);
       },
     });
     // This adds a complex command that can check whether the current state of the app allows execution of the command
