@@ -19,6 +19,27 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
   mySetting: 'default',
 };
 
+function generateLinkTitle(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.hostname === 'github.com') {
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (parts.length >= 2) {
+        const org = parts[0];
+        const repo = parts[1];
+        if (parts.length >= 4 && parts[2] === 'pull') {
+          const pr = parts[3];
+          return `${org}/${repo}#${pr}`;
+        }
+        return `${org}/${repo}`;
+      }
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  return url;
+}
+
 export default class MyPlugin extends Plugin {
   settings: MyPluginSettings;
 
@@ -56,6 +77,20 @@ export default class MyPlugin extends Plugin {
       editorCallback: (editor: Editor, view: MarkdownView) => {
         console.log(editor.getSelection());
         editor.replaceSelection('Sample Editor Command');
+      },
+    });
+
+    this.addCommand({
+      id: 'insert-smart-link',
+      name: 'Insert smart link',
+      editorCallback: (editor: Editor) => {
+        const url = editor.getSelection().trim();
+        if (!url) {
+          new Notice('Please select a URL to convert into a smart link.');
+          return;
+        }
+        const title = generateLinkTitle(url);
+        editor.replaceSelection(`[${title}](${url})`);
       },
     });
     // This adds a complex command that can check whether the current state of the app allows execution of the command
